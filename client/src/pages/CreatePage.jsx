@@ -31,9 +31,16 @@ export default function CreatePage() {
   const mediaRecorderRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const audioContextRef = useRef(null);
+  const analyserFrameRef = useRef(null);
+  const silenceTimerRef = useRef(null);
+  const hasSpeechRef = useRef(false);
   const promptRef = useRef("");
 
   useEffect(() => () => {
+    window.cancelAnimationFrame(analyserFrameRef.current);
+    window.clearTimeout(silenceTimerRef.current);
+    audioContextRef.current?.close();
     mediaRecorderRef.current?.stop();
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
   }, []);
@@ -64,11 +71,17 @@ export default function CreatePage() {
         if (event.data.size) audioChunksRef.current.push(event.data);
       };
       recorder.onerror = () => {
+        window.cancelAnimationFrame(analyserFrameRef.current);
+        window.clearTimeout(silenceTimerRef.current);
         stream.getTracks().forEach((track) => track.stop());
         setListening(false);
         setError("Audio recording failed. Please check your microphone and try again.");
       };
       recorder.onstop = async () => {
+        window.cancelAnimationFrame(analyserFrameRef.current);
+        window.clearTimeout(silenceTimerRef.current);
+        await audioContextRef.current?.close();
+        audioContextRef.current = null;
         stream.getTracks().forEach((track) => track.stop());
         setListening(false);
         const audio = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
@@ -91,6 +104,38 @@ export default function CreatePage() {
         }
       };
       recorder.start();
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      const levels = new Uint8Array(analyser.fftSize);
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      audioContextRef.current = audioContext;
+      hasSpeechRef.current = false;
+      const startedAt = Date.now();
+      const monitorSilence = () => {
+        if (recorder.state !== "recording") return;
+        analyser.getByteTimeDomainData(levels);
+        const volume = Math.sqrt(
+          levels.reduce((sum, level) => sum + ((level - 128) / 128) ** 2, 0) / levels.length,
+        );
+        if (volume > 0.035) {
+          hasSpeechRef.current = true;
+          window.clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        } else if (hasSpeechRef.current && !silenceTimerRef.current) {
+          silenceTimerRef.current = window.setTimeout(() => {
+            silenceTimerRef.current = null;
+            if (recorder.state === "recording") recorder.stop();
+          }, 1200);
+        }
+        if (Date.now() - startedAt >= 20000) {
+          recorder.stop();
+          return;
+        }
+        analyserFrameRef.current = window.requestAnimationFrame(monitorSilence);
+      };
+      analyserFrameRef.current = window.requestAnimationFrame(monitorSilence);
       setError("");
       setListening(true);
     } catch (recordingError) {
@@ -119,7 +164,7 @@ export default function CreatePage() {
         <div className="mt-space-xl w-full rounded-xl border border-outline-variant bg-surface-container-lowest p-space-lg text-left shadow-soft">
           <textarea aria-label="Describe your voice agent" className="min-h-32 w-full resize-none border-0 bg-transparent text-body-md outline-none placeholder:text-outline/70" maxLength={500} onChange={(event) => setValue(event.target.value)} placeholder="A friendly receptionist for my dental clinic who books appointments in English and Hindi..." value={prompt} />
           <div className="mt-space-md flex items-center justify-between border-t border-outline-variant pt-space-md">
-            <button aria-label="Record voice dictation" className={`rounded-full px-space-md py-1 text-label-md ${listening ? "bg-primary text-on-primary" : "bg-surface-container"}`} disabled={transcribing} onClick={toggleDictation} type="button"><Icon className="mr-1 text-[14px]">mic</Icon>{transcribing ? "Transcribing..." : listening ? "Stop & transcribe" : "Dictate"}</button>
+            <button aria-label="Record voice dictation" className={`rounded-full px-space-md py-1 text-label-md ${listening ? "bg-primary text-on-primary" : "bg-surface-container"}`} disabled={transcribing} onClick={toggleDictation} type="button"><Icon className="mr-1 text-[14px]">mic</Icon>{transcribing ? "Transcribing..." : listening ? "Listening..." : "Dictate"}</button>
             <div className="flex items-center gap-space-md"><span className="font-mono text-label-sm text-outline">{prompt.length} / 500</span><Button disabled={!prompt.trim() || loading} onClick={handleGenerate}><Icon className="text-[16px]">auto_awesome</Icon>{loading ? "Building your agent..." : "Generate agent"}</Button></div>
           </div>
           {error && <p className="mt-space-sm text-body-sm text-error">{error}</p>}
