@@ -3,7 +3,7 @@ import Badge from "./Badge";
 import Button from "./Button";
 import Card from "./Card";
 import Skeleton from "./Skeleton";
-import { listVoices } from "../lib/api";
+import { getHindiVoicePreview, listVoices } from "../lib/api";
 
 function Icon({ children, className = "" }) {
   return <span className={`material-symbols-outlined ${className}`}>{children}</span>;
@@ -59,6 +59,7 @@ function normalizeVoice(voice) {
     voice_id: voice.voice_id || voice.voiceId,
     preview_url: voice.preview_url || voice.previewUrl,
     languages: [...new Set(languages.map((item) => String(item).toLowerCase()))],
+    supportsHindi: languages.some((item) => String(item).toLowerCase() === "hi"),
     tags: [...new Set([useCase, language, gender, tone, communication, ...tags].filter(Boolean))],
     language: String(language).toLowerCase(),
     gender: String(gender).toLowerCase(),
@@ -192,7 +193,10 @@ export default function VoicePicker({ selectedVoiceId = "", onSelect, selectable
   };
 
   const togglePreview = (voice) => {
-    if (!voice.preview_url) return;
+    const previewUrl = voice.supportsHindi
+      ? getHindiVoicePreview(voice.voice_id)
+      : voice.preview_url;
+    if (!previewUrl) return;
     if (playingId === voice.voice_id) {
       stopPreview();
       return;
@@ -200,7 +204,7 @@ export default function VoicePicker({ selectedVoiceId = "", onSelect, selectable
 
     if (!audioRef.current) audioRef.current = new Audio();
     audioRef.current.pause();
-    audioRef.current.src = voice.preview_url;
+    audioRef.current.src = previewUrl;
     audioRef.current.onended = () => setPlayingId("");
     audioRef.current.play().then(() => setPlayingId(voice.voice_id)).catch(() => setError("Voice preview could not be played"));
   };
@@ -258,11 +262,11 @@ export default function VoicePicker({ selectedVoiceId = "", onSelect, selectable
               </div>
               <div className="mt-space-lg rounded-lg bg-surface-container-low p-space-md">
                 <div className="flex items-center justify-between gap-space-sm text-label-sm">
-                  <button className="flex items-center gap-space-sm font-semibold" disabled={!voice.preview_url} onClick={() => togglePreview(voice)} type="button">
+                  <button className="flex items-center gap-space-sm font-semibold" disabled={!voice.preview_url && !voice.supportsHindi} onClick={() => togglePreview(voice)} type="button">
                     <Icon className="text-[18px]">{playingId === voice.voice_id ? "pause_circle" : "play_circle"}</Icon>
-                    {playingId === voice.voice_id ? "Playing preview" : "Play preview"}
+                    {playingId === voice.voice_id ? "Playing preview" : voice.supportsHindi ? "Play Hindi preview" : "Play preview"}
                   </button>
-                  <span className="text-outline">{voice.preview_url ? "Sample" : "No preview"}</span>
+                  <span className="text-outline">{voice.supportsHindi ? "Hindi sample" : voice.preview_url ? "Sample" : "No preview"}</span>
                 </div>
                 <div
                   aria-label={playingId === voice.voice_id ? "Voice waveform playing" : "Voice waveform"}

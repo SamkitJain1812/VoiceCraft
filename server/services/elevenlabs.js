@@ -118,6 +118,16 @@ export async function transcribeAudio({ data, filename, contentType }) {
   });
 }
 
+export async function synthesizeHindiPreview(voiceId) {
+  const client = await getClient();
+  return client.textToSpeech.convert(voiceId, {
+    modelId: "eleven_multilingual_v2",
+    languageCode: "hi",
+    outputFormat: "mp3_44100_128",
+    text: "नमस्ते, मैं आपकी सहायता करने के लिए यहां हूं। आप कैसे हैं?",
+  });
+}
+
 function voiceId(voice) {
   return voice?.voiceId || voice?.voice_id;
 }

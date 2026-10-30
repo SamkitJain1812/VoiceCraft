@@ -16,6 +16,7 @@ import {
   placeTwilioOutboundCall,
   updateAgent,
   transcribeAudio,
+  synthesizeHindiPreview,
 } from "../services/elevenlabs.js";
 import { generateSpec, generateTestScenarios, refineSpec, scoreTestTranscript } from "../services/llm.js";
 import { simulateConversation } from "../services/elevenlabs.js";
@@ -538,6 +539,31 @@ router.post(
     const text = typeof result?.text === "string" ? result.text.trim() : "";
     if (!text) throw requestError("No speech was detected", 422);
     res.json({ text });
+  }),
+);
+
+router.get(
+  "/voices/:voiceId/hindi-preview",
+  asyncHandler(async (req, res) => {
+    const voiceId = validateText(req.params.voiceId, "voiceId", 100);
+    const audio = await synthesizeHindiPreview(voiceId);
+    res.type("audio/mpeg");
+    if (audio?.pipe) {
+      audio.pipe(res);
+      return;
+    }
+    if (audio?.getReader) {
+      const reader = audio.getReader();
+      res.on("close", () => reader.cancel().catch(() => {}));
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(Buffer.from(value));
+      }
+      res.end();
+      return;
+    }
+    throw requestError("ElevenLabs returned an invalid audio stream", 502);
   }),
 );
 

@@ -93,6 +93,9 @@ export const transcribeAudio = (blob) => {
   return request("/speech-to-text", { method: "POST", body });
 };
 
+export const getHindiVoicePreview = (voiceId) =>
+  `${API_URL}/api/voices/${encodeURIComponent(voiceId)}/hindi-preview`;
+
 export const listConversations = () => request("/conversations");
 
 export const getConversation = (id) => request(`/conversations/${id}`);
