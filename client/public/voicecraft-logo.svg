@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 110" role="img" aria-labelledby="title desc">
+  <title id="title">VoiceCraft</title>
+  <desc id="desc">VoiceCraft logo with an abstract voice mark and the tagline A no-code voice AI agent</desc>
+  <defs>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111111"/>
+      <stop offset="1" stop-color="#363636"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#mark)" d="M10 19c18-1 35 0 47 4 14 5 22 17 30 33l20 42c4 8 9 10 14 7 11-7 18-21 25-42 6-18 17-39 34-43 14-4 27 3 35 15 7 11 13 27 23 29 8 2 14-5 18-14-2 22-13 37-29 40-20 4-29-12-37-28-5-10-10-14-16-12-9 3-15 17-21 37-8 26-19 42-38 50-17 7-34-2-45-21L48 39C40 25 27 20 10 19Z"/>
+  <text x="174" y="58" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="46" font-weight="700" letter-spacing="-2">Voice<tspan font-weight="400">Craft</tspan></text>
+  <text x="178" y="88" fill="#303030" font-family="Inter, Arial, sans-serif" font-size="12" letter-spacing="5">A NO-CODE VOICE AI AGENT</text>
+</svg>

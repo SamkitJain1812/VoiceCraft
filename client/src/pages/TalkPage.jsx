@@ -7,10 +7,7 @@ export default function TalkPage() {
     <main className="min-h-screen bg-surface px-space-lg py-space-xl">
       <div className="mx-auto flex max-w-xl flex-col items-center">
         <div className="mb-space-xl flex w-full items-center justify-between">
-          <span className="flex items-center gap-space-sm text-label-md font-semibold">
-            <span className="flex h-5 w-5 items-center justify-center rounded bg-primary text-[10px] text-on-primary">◼</span>
-            VoiceCraft
-          </span>
+          <img alt="VoiceCraft" className="h-9 w-[150px] object-contain object-left" src="/voicecraft-logo.svg" />
           <span className="rounded-full bg-secondary-container px-space-md py-1 text-label-sm text-on-tertiary-container">● Ready to talk</span>
         </div>
         <h1 className="text-display-sm font-semibold">Voice assistant</h1>
