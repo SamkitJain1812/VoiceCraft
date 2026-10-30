@@ -28,6 +28,7 @@ export default function CreatePage() {
   const [error, setError] = useState("");
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef(null);
+  const dictationRetryRef = useRef(false);
   const promptRef = useRef("");
   const SpeechRecognition = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
   const recognitionSupported = Boolean(SpeechRecognition);
@@ -39,7 +40,7 @@ export default function CreatePage() {
     setPrompt(nextValue);
     setError("");
   };
-  const toggleDictation = () => {
+  const toggleDictation = (isRetry = false) => {
     if (!recognitionSupported) {
       setError("Dictation is not supported in this browser. Use Chrome or Edge on desktop.");
       return;
@@ -48,13 +49,14 @@ export default function CreatePage() {
       recognitionRef.current?.stop();
       return;
     }
+    if (!isRetry) dictationRetryRef.current = false;
     if (typeof window !== "undefined" && !window.isSecureContext && window.location.hostname !== "localhost") {
       setError("Microphone dictation requires a secure HTTPS connection.");
       return;
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = "en-IN";
+    recognition.lang = "en-US";
     recognition.interimResults = false;
     recognition.continuous = false;
     recognition.maxAlternatives = 1;
@@ -72,14 +74,22 @@ export default function CreatePage() {
         const current = promptRef.current;
         setValue(`${current}${current && !current.endsWith(" ") ? " " : ""}${transcript}`);
       }
+      dictationRetryRef.current = false;
     };
     recognition.onerror = (event) => {
+      if (event.error === "network" && !dictationRetryRef.current) {
+        dictationRetryRef.current = true;
+        setListening(false);
+        recognition.stop();
+        window.setTimeout(() => toggleDictation(true), 150);
+        return;
+      }
       const messages = {
         "audio-capture": "No microphone was found. Connect a microphone and try again.",
         "no-speech": "No speech was detected. Speak clearly and try again.",
         "not-allowed": "Microphone access was blocked. Allow microphone access for VoiceCraft in your browser settings.",
         "service-not-allowed": "Browser speech recognition is unavailable. Use Chrome or Edge and try again.",
-        network: "Speech recognition could not reach the browser speech service. Check your connection or use Chrome.",
+        network: "Your browser speech service is unavailable. Allow speech recognition for this site, then reload the page, or use Chrome on localhost.",
       };
       setError(messages[event.error] || `Dictation failed (${event.error || "unknown error"}). Please try again.`);
       setListening(false);
