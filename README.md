@@ -1,5 +1,4 @@
 # VoiceCraft
-
 VoiceCraft is a no-code voice AI agent builder. Describe an assistant in plain language, generate its agent specification, test it with simulated callers, refine it conversationally, deploy it to the web or phone, and review conversations.
 
 ## Architecture
