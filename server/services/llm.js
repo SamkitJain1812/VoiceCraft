@@ -131,24 +131,25 @@ async function generateJson(contents, systemInstruction) {
     if (error instanceof SyntaxError) {
       throw new Error("Gemini returned invalid JSON for the agent spec");
     }
-
-    async function generateStructured(contents, systemInstruction, responseSchema) {
-      const response = await ai.models.generateContent({
-        model,
-        contents,
-        config: {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema,
-        },
-      });
-      try {
-        return JSON.parse(response.text);
-      } catch {
-        throw new Error("Gemini returned invalid JSON for automated testing");
-      }
-    }
     throw error;
+  }
+}
+
+async function generateStructured(contents, systemInstruction, responseSchema) {
+  const response = await ai.models.generateContent({
+    model,
+    contents,
+    config: {
+      systemInstruction,
+      responseMimeType: "application/json",
+      responseSchema,
+    },
+  });
+
+  try {
+    return JSON.parse(response.text);
+  } catch {
+    throw new Error("Gemini returned invalid JSON for automated testing");
   }
 }
 

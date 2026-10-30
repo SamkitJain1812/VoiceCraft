@@ -15,7 +15,12 @@ export default function Topbar() {
         />
       </label>
       <div className="flex items-center gap-space-lg">
-        <a href="#" className="text-label-md text-on-surface-variant hover:text-on-surface">
+        <a
+          href="https://github.com/SamkitJain1812/VoiceCraft"
+          target="_blank"
+          rel="noreferrer"
+          className="text-label-md text-on-surface-variant hover:text-on-surface"
+        >
           Docs
         </a>
         <span className="material-symbols-outlined text-[16px] text-on-surface-variant">help</span>

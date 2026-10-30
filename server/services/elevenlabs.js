@@ -72,8 +72,14 @@ export async function createAgent(spec) {
 export async function updateAgent(elevenAgentId, spec) {
   const client = await getClient();
   return client.conversationalAi.agents.update(elevenAgentId, {
+    name: spec.name,
     conversationConfig: conversationConfig(spec),
   });
+}
+
+export async function deleteAgent(elevenAgentId) {
+  const client = await getClient();
+  return client.conversationalAi.agents.delete(elevenAgentId, { force: true });
 }
 
 export async function getSignedUrl(elevenAgentId) {

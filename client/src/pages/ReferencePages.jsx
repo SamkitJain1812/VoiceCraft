@@ -5,7 +5,8 @@ import Button from "../components/Button";
 import Card from "../components/Card";
 import TestConsole from "../components/TestConsole";
 import DeployModal from "../components/DeployModal";
-import { getAgent, getConversation, listAgents, listConversations, refineAgent, runAgentTests } from "../lib/api";
+import Modal from "../components/Modal";
+import { deleteAgent, getAgent, getConversation, listAgents, listConversations, refineAgent, runAgentTests, updateAgent } from "../lib/api";
 import VoicePicker from "../components/VoicePicker";
 import Skeleton from "../components/Skeleton";
 import {
@@ -62,7 +63,7 @@ export function HomePage() {
         <div className="grid gap-space-lg md:grid-cols-3">
           {["Customer Support Agent", "Outbound Sales SDR", "Appointment Booking"].map((item, index) => (
             <Card className="p-space-lg" key={item}>
-              <div className="mb-space-lg flex justify-between"><span className="rounded-lg bg-surface-container p-space-sm"><Icon>{["call", "trending_up", "calendar_today"][index]}</Icon></span><Badge>Template</Badge></div>
+              <div className="mb-space-lg"><span className="rounded-lg bg-surface-container p-space-sm"><Icon>{["call", "trending_up", "calendar_today"][index]}</Icon></span></div>
               <h2 className="font-semibold">{item}</h2>
               <p className="mt-1 text-body-sm text-on-surface-variant">{["Fast, empathetic phone support with FAQ grounding, order resolution, and live call transfer.", "Friendly, natural conversational qualifier with smart objection handling and low latency.", "Integrated calendar assistant for real-time scheduling, reschedules, and SMS confirmations."][index]}</p>
               <div className="mt-space-lg flex justify-between text-label-sm text-outline"><span>{["380ms avg latency", "Adaptive tone", "Cal & Google sync"][index]}</span><span>→</span></div>
@@ -77,15 +78,67 @@ export function HomePage() {
 export function AgentsPage() {
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [menuAgentId, setMenuAgentId] = useState(null);
+  const [renameAgent, setRenameAgent] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [agentName, setAgentName] = useState("");
+  const [busy, setBusy] = useState(false);
   useEffect(() => { listAgents().then(setAgents).catch(() => setAgents([])).finally(() => setLoading(false)); }, []);
+
+  const openRename = (agent) => {
+    setMenuAgentId(null);
+    setRenameAgent(agent);
+    setAgentName(agent.name || "");
+  };
+
+  const rename = async (event) => {
+    event.preventDefault();
+    const name = agentName.trim();
+    if (!renameAgent || !name || busy) return;
+    setBusy(true);
+    try {
+      const fullAgent = await getAgent(renameAgent.id);
+      await updateAgent(renameAgent.id, { ...fullAgent.currentSpec, name });
+      setAgents((items) => items.map((agent) => agent.id === renameAgent.id ? { ...agent, name } : agent));
+      setRenameAgent(null);
+    } catch {
+      // The shared API helper displays request errors.
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!deleteTarget || busy) return;
+    setBusy(true);
+    try {
+      await deleteAgent(deleteTarget.id);
+      setAgents((items) => items.filter((agent) => agent.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch {
+      // The shared API helper displays request errors.
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <div className="mx-auto max-w-6xl px-space-xl py-space-xl">
       <PageHeader title="Agents" description="Build, test, and manage your voice assistants." actions={<Link to="/create"><Button><Icon>add</Icon>Create agent</Button></Link>} />
       {loading ? <div className="grid gap-space-lg md:grid-cols-2 lg:grid-cols-3">{[1, 2, 3].map((item) => <Card className="space-y-4 p-space-lg" key={item}><Skeleton className="h-9 w-9" /><Skeleton className="h-5 w-2/3" /><Skeleton className="h-4 w-1/2" /></Card>)}</div> : agents.length === 0 ? <EmptyState icon="smart_toy" title="No agents yet" text="Create your first voice agent from a plain-language description." action="Create an agent" /> : (
         <div className="grid gap-space-lg md:grid-cols-2 lg:grid-cols-3">{agents.map((agent) => (
-          <Link to={`/agents/${agent.id}`} key={agent.id}><Card className="p-space-lg transition-shadow hover:shadow-md"><div className="flex items-center justify-between"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-container"><Icon>smart_toy</Icon></span><Badge>Live</Badge></div><h2 className="mt-space-lg font-semibold">{agent.name}</h2><p className="mt-1 text-body-sm text-on-surface-variant">{agent.language || "English"} · Updated recently</p><div className="mt-space-lg text-label-sm text-outline">Open workspace →</div></Card></Link>
+          <Link to={`/agents/${agent.id}`} key={agent.id}><Card className="relative p-space-lg transition-shadow hover:shadow-md"><div className="flex items-center justify-between"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-container"><Icon>smart_toy</Icon></span><div className="flex items-center gap-space-sm"><Badge>Live</Badge><button type="button" aria-label={`More options for ${agent.name}`} aria-expanded={menuAgentId === agent.id} className="rounded-full p-1 text-on-surface-variant hover:bg-surface-container hover:text-on-surface" onClick={(event) => { event.preventDefault(); setMenuAgentId((id) => id === agent.id ? null : agent.id); }}><Icon>more_vert</Icon></button></div></div>{menuAgentId === agent.id && <div className="absolute right-space-lg top-14 z-10 w-32 rounded-lg border border-outline-variant bg-surface-container-lowest py-1 shadow-lg"><button type="button" className="flex w-full items-center gap-space-sm px-space-md py-2 text-left text-body-sm hover:bg-surface-container" onClick={(event) => { event.preventDefault(); openRename(agent); }}><Icon className="text-[16px]">edit</Icon>Rename</button><button type="button" className="flex w-full items-center gap-space-sm px-space-md py-2 text-left text-body-sm text-error hover:bg-error/5" onClick={(event) => { event.preventDefault(); setMenuAgentId(null); setDeleteTarget(agent); }}><Icon className="text-[16px]">delete</Icon>Delete</button></div>}<h2 className="mt-space-lg font-semibold">{agent.name}</h2><p className="mt-1 text-body-sm text-on-surface-variant">{agent.language || "English"} · Updated recently</p><div className="mt-space-lg text-label-sm text-outline">Open workspace →</div></Card></Link>
         ))}</div>
       )}
+      <Modal open={Boolean(renameAgent)} title="Rename agent" onClose={() => !busy && setRenameAgent(null)}>
+        <form className="space-y-space-lg" onSubmit={rename}>
+          <label className="block text-body-sm font-semibold" htmlFor="agent-name">Agent name</label>
+          <input autoFocus className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-space-md py-space-sm outline-none focus:border-primary" id="agent-name" maxLength={120} onChange={(event) => setAgentName(event.target.value)} value={agentName} />
+          <div className="flex justify-end gap-space-sm"><Button disabled={busy} onClick={() => setRenameAgent(null)} type="button" variant="secondary">Cancel</Button><Button disabled={busy || !agentName.trim()} type="submit">{busy ? "Saving..." : "Save name"}</Button></div>
+        </form>
+      </Modal>
+      <Modal open={Boolean(deleteTarget)} title="Delete agent" onClose={() => !busy && setDeleteTarget(null)}>
+        <div className="space-y-space-lg"><p className="text-body-sm text-on-surface-variant">Delete <span className="font-semibold text-on-surface">{deleteTarget?.name}</span>? This permanently removes the agent and its saved versions.</p><div className="flex justify-end gap-space-sm"><Button disabled={busy} onClick={() => setDeleteTarget(null)} variant="secondary">Cancel</Button><Button className="bg-error hover:bg-error/90" disabled={busy} onClick={remove}>{busy ? "Deleting..." : "Delete agent"}</Button></div></div>
+      </Modal>
     </div>
   );
 }

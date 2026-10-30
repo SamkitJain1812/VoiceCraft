@@ -47,6 +47,17 @@ export async function saveAgent(agent) {
   return agent;
 }
 
+export async function deleteAgent(id) {
+  const database = await readDatabase();
+  const index = database.agents.findIndex((agent) => agent.id === id);
+
+  if (index === -1) return false;
+
+  database.agents.splice(index, 1);
+  await writeDatabase(database);
+  return true;
+}
+
 export async function addVersion(id, spec) {
   const database = await readDatabase();
   const agent = database.agents.find((item) => item.id === id);

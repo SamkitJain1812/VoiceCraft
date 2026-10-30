@@ -16,6 +16,7 @@ const request = async (path, options = {}) => {
     showToast(error.message);
     throw error;
   }
+  if (response.status === 204) return null;
   const contentType = response.headers.get("content-type") || "";
   const raw = await response.text();
   let data;
@@ -74,6 +75,8 @@ export const updateAgent = (id, spec) =>
     method: "PATCH",
     body: JSON.stringify({ spec }),
   });
+
+export const deleteAgent = (id) => request(`/agents/${id}`, { method: "DELETE" });
 
 export const restoreAgentVersion = (id, version) =>
   request(`/agents/${id}/restore`, {

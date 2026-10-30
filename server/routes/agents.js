@@ -6,6 +6,7 @@ import {
   createAgent,
   createKnowledgeBaseFromFile,
   createKnowledgeBaseFromUrl,
+  deleteAgent as deleteElevenLabsAgent,
   ensureVoiceId,
   findVoiceForLanguage,
   getConversation,
@@ -22,6 +23,7 @@ import { generateSpec, generateTestScenarios, refineSpec, scoreTestTranscript } 
 import { simulateConversation } from "../services/elevenlabs.js";
 import {
   addVersion,
+  deleteAgent,
   getAgent,
   listAgents,
   saveAgent,
@@ -434,6 +436,16 @@ router.patch(
     await updateAgent(agent.elevenAgentId, nextSpec);
     const updatedAgent = await addVersion(agent.id, nextSpec);
     res.json({ spec: nextSpec, version: updatedAgent.versions.at(-1) });
+  }),
+);
+
+router.delete(
+  "/agents/:id",
+  asyncHandler(async (req, res) => {
+    const agent = requireAgent(await getAgent(req.params.id));
+    await deleteElevenLabsAgent(agent.elevenAgentId);
+    await deleteAgent(agent.id);
+    res.status(204).end();
   }),
 );
 
