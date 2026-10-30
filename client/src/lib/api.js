@@ -87,6 +87,12 @@ export const getPublicAgentSignedUrl = (id) => request(`/public/${id}/signed-url
 
 export const listVoices = () => request("/voices");
 
+export const transcribeAudio = (blob) => {
+  const body = new FormData();
+  body.append("audio", blob, "voicecraft-recording.webm");
+  return request("/speech-to-text", { method: "POST", body });
+};
+
 export const listConversations = () => request("/conversations");
 
 export const getConversation = (id) => request(`/conversations/${id}`);

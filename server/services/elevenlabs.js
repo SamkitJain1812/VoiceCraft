@@ -105,6 +105,19 @@ export async function listVoices() {
   return { voices, ...(totalCount === undefined ? {} : { totalCount }) };
 }
 
+export async function transcribeAudio({ data, filename, contentType }) {
+  const client = await getClient();
+  return client.speechToText.convert({
+    modelId: "scribe_v2",
+    file: {
+      data,
+      filename,
+      contentType,
+    },
+    languageCode: "eng",
+  });
+}
+
 function voiceId(voice) {
   return voice?.voiceId || voice?.voice_id;
 }

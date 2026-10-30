@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
-import { generateAgent } from "../lib/api";
+import { generateAgent, transcribeAudio } from "../lib/api";
 
 const chips = [
   ["Lead Generation", "person_add", "Build a friendly lead generation agent that qualifies prospects by asking about their needs, budget, and timeline, then books a meeting."],
@@ -27,82 +27,79 @@ export default function CreatePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [listening, setListening] = useState(false);
-  const recognitionRef = useRef(null);
-  const dictationRetryRef = useRef(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+  const audioChunksRef = useRef([]);
   const promptRef = useRef("");
-  const SpeechRecognition = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
-  const recognitionSupported = Boolean(SpeechRecognition);
 
-  useEffect(() => () => recognitionRef.current?.stop(), []);
+  useEffect(() => () => {
+    mediaRecorderRef.current?.stop();
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
   const setValue = (value) => {
     const nextValue = value.slice(0, 500);
     promptRef.current = nextValue;
     setPrompt(nextValue);
     setError("");
   };
-  const toggleDictation = (isRetry = false) => {
-    if (!recognitionSupported) {
-      setError("Dictation is not supported in this browser. Use Chrome or Edge on desktop.");
-      return;
-    }
+  const toggleDictation = async () => {
     if (listening) {
-      recognitionRef.current?.stop();
+      mediaRecorderRef.current?.stop();
       return;
     }
-    if (!isRetry) dictationRetryRef.current = false;
-    if (typeof window !== "undefined" && !window.isSecureContext && window.location.hostname !== "localhost") {
-      setError("Microphone dictation requires a secure HTTPS connection.");
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      setError("Audio recording is not supported in this browser. Use a current Chrome, Edge, or Safari browser.");
       return;
     }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
-    recognition.continuous = false;
-    recognition.maxAlternatives = 1;
-    recognition.onstart = () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]
+        .find((type) => MediaRecorder.isTypeSupported(type)) || "";
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      audioChunksRef.current = [];
+      mediaStreamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) audioChunksRef.current.push(event.data);
+      };
+      recorder.onerror = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        setListening(false);
+        setError("Audio recording failed. Please check your microphone and try again.");
+      };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        setListening(false);
+        const audio = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        if (!audio.size) {
+          setError("No audio was recorded. Speak clearly and try again.");
+          return;
+        }
+        setTranscribing(true);
+        setError("");
+        try {
+          const result = await transcribeAudio(audio);
+          const transcript = result.text?.trim();
+          if (!transcript) throw new Error("No speech was detected. Speak clearly and try again.");
+          const current = promptRef.current;
+          setValue(`${current}${current && !current.endsWith(" ") ? " " : ""}${transcript}`);
+        } catch (transcriptionError) {
+          setError(transcriptionError.message || "Voice transcription failed. Please try again.");
+        } finally {
+          setTranscribing(false);
+        }
+      };
+      recorder.start();
       setError("");
       setListening(true);
-    };
-    recognition.onresult = (event) => {
-      const transcript = Array.from(event.results)
-        .filter((result) => result.isFinal)
-        .map((result) => result[0]?.transcript || "")
-        .join(" ")
-        .trim();
-      if (transcript) {
-        const current = promptRef.current;
-        setValue(`${current}${current && !current.endsWith(" ") ? " " : ""}${transcript}`);
-      }
-      dictationRetryRef.current = false;
-    };
-    recognition.onerror = (event) => {
-      if (event.error === "network" && !dictationRetryRef.current) {
-        dictationRetryRef.current = true;
-        setListening(false);
-        recognition.stop();
-        window.setTimeout(() => toggleDictation(true), 150);
-        return;
-      }
-      const messages = {
-        "audio-capture": "No microphone was found. Connect a microphone and try again.",
-        "no-speech": "No speech was detected. Speak clearly and try again.",
-        "not-allowed": "Microphone access was blocked. Allow microphone access for VoiceCraft in your browser settings.",
-        "service-not-allowed": "Browser speech recognition is unavailable. Use Chrome or Edge and try again.",
-        network: "Your browser speech service is unavailable. Allow speech recognition for this site, then reload the page, or use Chrome on localhost.",
-      };
-      setError(messages[event.error] || `Dictation failed (${event.error || "unknown error"}). Please try again.`);
-      setListening(false);
-    };
-    recognition.onend = () => setListening(false);
-    recognitionRef.current = recognition;
-    try {
-      recognition.start();
-    } catch (startError) {
-      setListening(false);
-      setError(startError.name === "InvalidStateError"
-        ? "Dictation is already starting. Please wait a moment and try again."
-        : "Unable to start microphone dictation. Check your browser microphone permission.");
+    } catch (recordingError) {
+      const message = recordingError.name === "NotAllowedError"
+        ? "Microphone access was blocked. Allow microphone access for VoiceCraft and try again."
+        : recordingError.name === "NotFoundError"
+          ? "No microphone was found. Connect a microphone and try again."
+          : "Unable to access your microphone. Check browser permissions and try again.";
+      setError(message);
     }
   };
   const handleGenerate = async () => {
@@ -122,7 +119,7 @@ export default function CreatePage() {
         <div className="mt-space-xl w-full rounded-xl border border-outline-variant bg-surface-container-lowest p-space-lg text-left shadow-soft">
           <textarea aria-label="Describe your voice agent" className="min-h-32 w-full resize-none border-0 bg-transparent text-body-md outline-none placeholder:text-outline/70" maxLength={500} onChange={(event) => setValue(event.target.value)} placeholder="A friendly receptionist for my dental clinic who books appointments in English and Hindi..." value={prompt} />
           <div className="mt-space-md flex items-center justify-between border-t border-outline-variant pt-space-md">
-            <button aria-label={recognitionSupported ? "Start voice dictation" : "Voice dictation is not supported in this browser"} className={`rounded-full px-space-md py-1 text-label-md ${listening ? "bg-primary text-on-primary" : "bg-surface-container"}`} onClick={toggleDictation} type="button"><Icon className="mr-1 text-[14px]">mic</Icon>{listening ? "Listening..." : "Dictate"}</button>
+            <button aria-label="Record voice dictation" className={`rounded-full px-space-md py-1 text-label-md ${listening ? "bg-primary text-on-primary" : "bg-surface-container"}`} disabled={transcribing} onClick={toggleDictation} type="button"><Icon className="mr-1 text-[14px]">mic</Icon>{transcribing ? "Transcribing..." : listening ? "Stop & transcribe" : "Dictate"}</button>
             <div className="flex items-center gap-space-md"><span className="font-mono text-label-sm text-outline">{prompt.length} / 500</span><Button disabled={!prompt.trim() || loading} onClick={handleGenerate}><Icon className="text-[16px]">auto_awesome</Icon>{loading ? "Building your agent..." : "Generate agent"}</Button></div>
           </div>
           {error && <p className="mt-space-sm text-body-sm text-error">{error}</p>}

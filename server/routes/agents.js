@@ -15,6 +15,7 @@ import {
   listVoices,
   placeTwilioOutboundCall,
   updateAgent,
+  transcribeAudio,
 } from "../services/elevenlabs.js";
 import { generateSpec, generateTestScenarios, refineSpec, scoreTestTranscript } from "../services/llm.js";
 import { simulateConversation } from "../services/elevenlabs.js";
@@ -50,6 +51,13 @@ const testLimiter = rateLimit({
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: { error: "Too many test runs. Please try again later." },
+});
+const transcriptionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { error: "Too many transcription requests. Please try again later." },
 });
 
 function requestError(message, statusCode = 400) {
@@ -510,6 +518,26 @@ router.get(
   "/voices",
   asyncHandler(async (_req, res) => {
     res.json(await listVoices());
+  }),
+);
+
+router.post(
+  "/speech-to-text",
+  transcriptionLimiter,
+  upload.single("audio"),
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw requestError("audio is required");
+    if (!req.file.mimetype.startsWith("audio/")) {
+      throw requestError("Only audio recordings are supported");
+    }
+    const result = await transcribeAudio({
+      data: req.file.buffer,
+      filename: req.file.originalname || "voicecraft-recording.webm",
+      contentType: req.file.mimetype,
+    });
+    const text = typeof result?.text === "string" ? result.text.trim() : "";
+    if (!text) throw requestError("No speech was detected", 422);
+    res.json({ text });
   }),
 );
 
