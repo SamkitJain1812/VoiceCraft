@@ -11,7 +11,7 @@ export default function Sidebar() {
     <aside className="fixed inset-y-0 left-0 z-40 flex w-[195px] flex-col justify-between border-r border-outline-variant bg-surface-container-lowest">
       <div>
         <div className="flex h-12 items-center border-b border-outline-variant px-space-lg">
-          <img alt="VoiceCraft" className="h-8 w-[150px] object-contain object-left" src="/voicecraft-logo.svg" />
+          <span className="text-headline-md font-semibold tracking-tight">VoiceCraft</span>
         </div>
         <div className="p-space-md pb-space-sm">
           <NavLink
